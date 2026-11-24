@@ -47,6 +47,7 @@
     <div id="colecciones"></div>
   </section>
 </main>
+<script src="catalogo.js"></script>
 <script>
 const K='tienda-demo';
 let db=JSON.parse(localStorage.getItem(K)||'{"productos":[],"colecciones":[]}');
@@ -58,10 +59,17 @@ function pintar(){
   $('productos').innerHTML=db.productos.map(p=>`<div class="card"><img src="${p.foto||''}" alt=""><div><b>${esc(p.nombre)}</b><small>${esc(p.descripcion)}</small>
     <button class="sec" onclick="editar(${p.id})">Editar</button><button class="sec" onclick="borrar(${p.id})">Borrar</button></div></div>`).join('')||'<small>Sin productos todavía.</small>';
   $('cchecks').innerHTML=db.productos.map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.nombre)}</label>`).join('')||'<small>Crea un producto primero.</small>';
-  $('colecciones').innerHTML=db.colecciones.map(c=>`<div class="card"><div><b>${esc(c.nombre)}</b><div class="items">${c.items.map(i=>`<span class="item"><img src="${i.foto||''}" alt="">${esc(i.nombre)}</span>`).join('')}</div></div></div>`).join('');
+  $('colecciones').innerHTML=db.colecciones.map(c=>{
+    const items=(c.items||[]).map(i=>Catalogo.vistaItem(db.productos,i)).filter(Boolean);
+    return `<div class="card"><div><b>${esc(c.nombre)}</b><div class="items">${items.map(i=>`<span class="item"><img src="${i.foto}" alt="">${esc(i.nombre)}</span>`).join('')}</div></div></div>`;
+  }).join('');
 }
 function editar(id){const p=db.productos.find(x=>x.id==id);$('pid').value=p.id;$('pnombre').value=p.nombre;$('pdesc').value=p.descripcion;$('pfoto').value='';}
-function borrar(id){db.productos=db.productos.filter(x=>x.id!=id);guardar();pintar();}
+function borrar(id){
+  db.productos=db.productos.filter(x=>x.id!=id);
+  db.colecciones.forEach(c=>{c.items=(c.items||[]).filter(i=>!(i&&i.productoId!=null&&i.productoId==id));});
+  guardar();pintar();
+}
 function limpiar(){$('pid').value='';$('pnombre').value='';$('pdesc').value='';$('pfoto').value='';$('paviso').textContent='';}
 function guardarProducto(foto){
   const nombre=$('pnombre').value.trim(); if(!nombre){$('paviso').textContent='Escribe un nombre.';return;}
@@ -80,17 +88,18 @@ $('pnuevo').onclick=limpiar;
 $('cguardar').onclick=()=>{
   const nombre=$('cnombre').value.trim(); if(!nombre)return;
   const ids=[...document.querySelectorAll('#cchecks input:checked')].map(i=>i.value);
-  const items=db.productos.filter(p=>ids.includes(String(p.id))).map(p=>({nombre:p.nombre,foto:p.foto}));
+  const items=db.productos.filter(p=>ids.includes(String(p.id))).map(p=>({productoId:p.id}));
   db.colecciones.push({id:Date.now(),nombre,items});guardar();$('cnombre').value='';pintar();
 };
 $('ejemplo').onclick=()=>{
   const a={id:1,nombre:'Polo Arena',descripcion:'Algodón, color arena',foto:svg('#c9a66b','PA')};
   const b={id:2,nombre:'Casaca Lima',descripcion:'Impermeable ligera',foto:svg('#3b6ea5','CL')};
   db={productos:[a,b],colecciones:[
-    {id:11,nombre:'Verano',items:[{nombre:a.nombre,foto:a.foto}]},
-    {id:12,nombre:'Ofertas',items:[{nombre:a.nombre,foto:a.foto},{nombre:b.nombre,foto:b.foto}]}]};
+    {id:11,nombre:'Verano',items:[{productoId:a.id}]},
+    {id:12,nombre:'Ofertas',items:[{productoId:a.id},{productoId:b.id}]}]};
   guardar();pintar();
 };
+if(Catalogo.vincularColecciones(db)) guardar();
 pintar();
 </script>
 </body>
