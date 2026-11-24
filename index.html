@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi tienda · catálogo y colecciones</title>
+<style>
+  body{font:16px/1.4 system-ui,sans-serif;margin:0;background:#f5f6f8;color:#1b2333}
+  header{background:#14213d;color:#fff;padding:14px 20px}
+  main{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px;max-width:1000px;margin:auto}
+  @media(max-width:760px){main{grid-template-columns:1fr}}
+  section{background:#fff;border-radius:10px;padding:16px}
+  h2{margin:0 0 10px;font-size:18px}
+  label{display:block;margin:8px 0 2px;font-size:14px}
+  input[type=text],textarea{width:100%;box-sizing:border-box;padding:7px;border:1px solid #c8cfdc;border-radius:6px}
+  button{background:#fb5604;color:#fff;border:0;border-radius:6px;padding:7px 12px;margin:8px 6px 0 0;cursor:pointer}
+  button.sec{background:#e4e7ee;color:#1b2333}
+  .card{border:1px solid #e1e5ee;border-radius:8px;padding:10px;margin-top:10px;display:flex;gap:10px;align-items:flex-start}
+  .card img{width:56px;height:56px;object-fit:cover;border-radius:6px;background:#eee}
+  .card small{color:#5b6475;display:block}
+  .items{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .item{font-size:13px;background:#eef1f7;border-radius:6px;padding:3px 7px;display:flex;gap:5px;align-items:center}
+  .item img{width:22px;height:22px;border-radius:4px;object-fit:cover}
+  .aviso{color:#a32;font-size:13px;min-height:18px}
+</style>
+</head>
+<body>
+<header><b>Mi tienda</b> · catálogo y colecciones (datos de ejemplo)</header>
+<main>
+  <section>
+    <h2>Productos</h2>
+    <input type="hidden" id="pid">
+    <label>Nombre</label><input type="text" id="pnombre">
+    <label>Descripción</label><textarea id="pdesc" rows="2"></textarea>
+    <label>Foto (máx. 300 KB)</label><input type="file" id="pfoto" accept="image/*">
+    <div class="aviso" id="paviso"></div>
+    <button id="pguardar">Guardar producto</button>
+    <button class="sec" id="pnuevo">Limpiar</button>
+    <button class="sec" id="ejemplo">Cargar ejemplo</button>
+    <div id="productos"></div>
+  </section>
+  <section>
+    <h2>Colecciones</h2>
+    <label>Nombre de la colección</label><input type="text" id="cnombre">
+    <label>Productos que incluye</label><div id="cchecks"></div>
+    <button id="cguardar">Guardar colección</button>
+    <div id="colecciones"></div>
+  </section>
+</main>
+<script>
+const K='tienda-demo';
+let db=JSON.parse(localStorage.getItem(K)||'{"productos":[],"colecciones":[]}');
+const $=id=>document.getElementById(id);
+const guardar=()=>localStorage.setItem(K,JSON.stringify(db));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const svg=(c,t)=>'data:image/svg+xml;utf8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="${c}"/><text x="40" y="48" font-size="26" text-anchor="middle" fill="#fff">${t}</text></svg>`);
+function pintar(){
+  $('productos').innerHTML=db.productos.map(p=>`<div class="card"><img src="${p.foto||''}" alt=""><div><b>${esc(p.nombre)}</b><small>${esc(p.descripcion)}</small>
+    <button class="sec" onclick="editar(${p.id})">Editar</button><button class="sec" onclick="borrar(${p.id})">Borrar</button></div></div>`).join('')||'<small>Sin productos todavía.</small>';
+  $('cchecks').innerHTML=db.productos.map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.nombre)}</label>`).join('')||'<small>Crea un producto primero.</small>';
+  $('colecciones').innerHTML=db.colecciones.map(c=>`<div class="card"><div><b>${esc(c.nombre)}</b><div class="items">${c.items.map(i=>`<span class="item"><img src="${i.foto||''}" alt="">${esc(i.nombre)}</span>`).join('')}</div></div></div>`).join('');
+}
+function editar(id){const p=db.productos.find(x=>x.id==id);$('pid').value=p.id;$('pnombre').value=p.nombre;$('pdesc').value=p.descripcion;$('pfoto').value='';}
+function borrar(id){db.productos=db.productos.filter(x=>x.id!=id);guardar();pintar();}
+function limpiar(){$('pid').value='';$('pnombre').value='';$('pdesc').value='';$('pfoto').value='';$('paviso').textContent='';}
+function guardarProducto(foto){
+  const nombre=$('pnombre').value.trim(); if(!nombre){$('paviso').textContent='Escribe un nombre.';return;}
+  const id=$('pid').value;
+  if(id){const p=db.productos.find(x=>x.id==id);p.nombre=nombre;p.descripcion=$('pdesc').value;if(foto)p.foto=foto;}
+  else db.productos.push({id:Date.now(),nombre,descripcion:$('pdesc').value,foto:foto||''});
+  guardar();limpiar();pintar();
+}
+$('pguardar').onclick=()=>{
+  const f=$('pfoto').files[0];
+  if(!f)return guardarProducto('');
+  if(f.size>300*1024){$('paviso').textContent='La foto pesa más de 300 KB.';return;}
+  const r=new FileReader();r.onload=()=>guardarProducto(r.result);r.readAsDataURL(f);
+};
+$('pnuevo').onclick=limpiar;
+$('cguardar').onclick=()=>{
+  const nombre=$('cnombre').value.trim(); if(!nombre)return;
+  const ids=[...document.querySelectorAll('#cchecks input:checked')].map(i=>i.value);
+  const items=db.productos.filter(p=>ids.includes(String(p.id))).map(p=>({nombre:p.nombre,foto:p.foto}));
+  db.colecciones.push({id:Date.now(),nombre,items});guardar();$('cnombre').value='';pintar();
+};
+$('ejemplo').onclick=()=>{
+  const a={id:1,nombre:'Polo Arena',descripcion:'Algodón, color arena',foto:svg('#c9a66b','PA')};
+  const b={id:2,nombre:'Casaca Lima',descripcion:'Impermeable ligera',foto:svg('#3b6ea5','CL')};
+  db={productos:[a,b],colecciones:[
+    {id:11,nombre:'Verano',items:[{nombre:a.nombre,foto:a.foto}]},
+    {id:12,nombre:'Ofertas',items:[{nombre:a.nombre,foto:a.foto},{nombre:b.nombre,foto:b.foto}]}]};
+  guardar();pintar();
+};
+pintar();
+</script>
+</body>
+</html>
